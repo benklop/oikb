@@ -350,6 +350,12 @@ def _run_sync_inner(
             check_stop()
             try:
                 content = connector.read_file(path, filename)
+                if not content:
+                    if progress is not None:
+                        progress.update(task_id, advance=1, description=f"[yellow]⚠ {display}[/yellow]")
+                    else:
+                        click.echo(click.style(f"  ⚠ {display}: empty content, skipping", fg="yellow"), err=True)
+                    return ("warning", f"{display}: empty content, skipping")
                 check_stop()
                 directory_id = directory_map.get(path) if path else None
                 client.upload_file(
@@ -375,7 +381,14 @@ def _run_sync_inner(
                     check_stop()
                     last_err = e
                     continue
-                last_err = e
+                detail = e.response.text.strip()
+                try:
+                    payload = e.response.json()
+                    if isinstance(payload, dict) and payload.get("detail"):
+                        detail = str(payload["detail"])
+                except ValueError:
+                    pass
+                last_err = RuntimeError(f"{e} — {detail}") if detail else e
                 break
             except SyncCancelled:
                 raise
