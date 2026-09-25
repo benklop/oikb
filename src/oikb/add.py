@@ -149,6 +149,10 @@ def add_files(
             continue
         cite_path = source_path if source_path is not None else str(path.resolve())
         try:
+            # Upload WITHOUT knowledge_id (link=False) and with process=False:
+            # the server must not auto-link or run the generic file-{id}
+            # embedding pass. The explicit add_file_to_knowledge(index=...)
+            # below is the SINGLE embedding pass (into the KB collection only).
             if reference:
                 metadata = {
                     "file_hash": file_hash,
@@ -161,7 +165,8 @@ def add_files(
                     kb_id=kb_id,
                     file_hash=file_hash,
                     directory_id=directory_id,
-                    process=index,
+                    process=False,
+                    link=False,
                     extra_metadata=metadata,
                 )
             else:
@@ -172,7 +177,8 @@ def add_files(
                     kb_id=kb_id,
                     file_hash=file_hash,
                     directory_id=directory_id,
-                    process=index,
+                    process=False,
+                    link=False,
                     extra_metadata={"source_path": cite_path},
                 )
             file_id = resp.get("id")

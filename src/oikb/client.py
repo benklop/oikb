@@ -74,6 +74,7 @@ class OikbClient:
         directory_id: str | None = None,
         process: bool = True,
         extra_metadata: dict[str, Any] | None = None,
+        link: bool = True,
     ) -> dict[str, Any]:
         """POST /files/ — upload a single file to the KB.
 
@@ -81,12 +82,18 @@ class OikbClient:
         (browse-only companions). ``extra_metadata`` is merged into the
         upload metadata (e.g. ``external_ref`` for reference files,
         ``source_path`` for provenance).
+
+        ``link=False`` omits ``knowledge_id`` from the upload metadata so the
+        server does NOT auto-link/auto-embed the file; the caller then links
+        it explicitly via :meth:`add_file_to_knowledge`, which is the single
+        embedding pass (avoids the double-embed of auto-link + explicit add).
         """
 
         metadata: dict[str, Any] = {
-            "knowledge_id": kb_id,
             "file_hash": file_hash,
         }
+        if link:
+            metadata["knowledge_id"] = kb_id
         if directory_id:
             metadata["directory_id"] = directory_id
         if extra_metadata:
