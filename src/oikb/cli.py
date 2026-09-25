@@ -590,6 +590,7 @@ def sync(
 @click.option("--dir", "rel_dir", default=None, help="Destination directory inside the KB (created if missing).")
 @click.option("--no-index", is_flag=True, help="Register files without extracting/indexing them (browse-only).")
 @click.option("--reference", is_flag=True, help="Store a pointer to the file instead of its bytes (requires ENABLE_REFERENCE_FILES on the server).")
+@click.option("--source-path", default=None, help="Override the model-facing citation path (source_path metadata) for all files in this call.")
 @click.option("--dry-run", is_flag=True, help="List what would be added without uploading.")
 @click.option("-v", "--verbose", is_flag=True, help="Show per-file progress.")
 @click.pass_context
@@ -603,6 +604,7 @@ def add(
     rel_dir: str | None,
     no_index: bool,
     reference: bool,
+    source_path: str | None,
     dry_run: bool,
     verbose: bool,
 ):
@@ -636,6 +638,7 @@ def add(
             reference=reference,
             dry_run=dry_run,
             verbose=verbose,
+            source_path=source_path,
         )
 
         if not quiet:

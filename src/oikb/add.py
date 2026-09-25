@@ -114,8 +114,17 @@ def add_files(
     reference: bool = False,
     dry_run: bool = False,
     verbose: bool = False,
+    source_path: str | None = None,
 ) -> AddResult:
-    """Upload and link each path to the KB. See module docstring."""
+    """Upload and link each path to the KB. See module docstring.
+
+    ``source_path`` (when given) overrides the model-facing citation path
+    recorded in the ``source_path`` metadata for every file in this call.
+    Leave it unset to default to each file's own absolute path. The
+    docs-pipeline uses this to cite the human-meaningful category-tree path
+    while the reference pointer (``external_ref.path``) still targets the
+    canonical by-date master.
+    """
     kb_id = kb["id"]
     result = AddResult()
 
@@ -138,12 +147,13 @@ def add_files(
             if verbose:
                 print(f"  = {path.name} (unchanged)")
             continue
+        cite_path = source_path if source_path is not None else str(path.resolve())
         try:
             if reference:
                 metadata = {
                     "file_hash": file_hash,
                     "external_ref": {"path": str(path.resolve())},
-                    "source_path": str(path.resolve()),
+                    "source_path": cite_path,
                 }
                 resp = client.upload_file(
                     file_content=_SENTINEL,
@@ -163,7 +173,7 @@ def add_files(
                     file_hash=file_hash,
                     directory_id=directory_id,
                     process=index,
-                    extra_metadata={"source_path": str(path.resolve())},
+                    extra_metadata={"source_path": cite_path},
                 )
             file_id = resp.get("id")
             if not file_id:
