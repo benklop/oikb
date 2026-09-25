@@ -72,8 +72,16 @@ class OikbClient:
         kb_id: str,
         file_hash: str,
         directory_id: str | None = None,
+        process: bool = True,
+        extra_metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """POST /files/ — upload a single file to the KB."""
+        """POST /files/ — upload a single file to the KB.
+
+        ``process=False`` registers the file without extracting/indexing it
+        (browse-only companions). ``extra_metadata`` is merged into the
+        upload metadata (e.g. ``external_ref`` for reference files,
+        ``source_path`` for provenance).
+        """
 
         metadata: dict[str, Any] = {
             "knowledge_id": kb_id,
@@ -81,12 +89,36 @@ class OikbClient:
         }
         if directory_id:
             metadata["directory_id"] = directory_id
+        if extra_metadata:
+            metadata.update(extra_metadata)
 
+        # `process` is a QUERY parameter on POST /files/ (not a form field).
+        params = {} if process else {"process": "false"}
         resp = self._http.post(
             "/files/",
+            params=params,
             files={"file": (filename, file_content)},
             data={"metadata": json.dumps(metadata)},
         )
+        resp.raise_for_status()
+        return resp.json()
+
+    def add_file_to_knowledge(
+        self,
+        kb_id: str,
+        file_id: str,
+        directory_id: str | None = None,
+        index: bool = True,
+    ) -> dict[str, Any]:
+        """POST /knowledge/{id}/file/add — link an existing file to the KB.
+
+        ``index=False`` links without embedding (browse-only companion);
+        requires an Open WebUI supporting the extended form.
+        """
+        payload: dict[str, Any] = {"file_id": file_id, "index": index}
+        if directory_id:
+            payload["directory_id"] = directory_id
+        resp = self._http.post(f"/knowledge/{kb_id}/file/add", json=payload)
         resp.raise_for_status()
         return resp.json()
 
@@ -147,3 +179,25 @@ class OikbClient:
         resp = self._http.get(f"/knowledge/{kb_id}/files")
         resp.raise_for_status()
         return resp.json().get("total", 0)
+    def list_kbs(self) -> list[dict[str, Any]]:
+        """GET /knowledge/ — list accessible knowledge bases."""
+        resp = self._http.get("/knowledge/")
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("items", []) if isinstance(data, dict) else data
+
+    def create_kb(self, name: str, description: str = "") -> dict[str, Any]:
+        """POST /knowledge/create — create a knowledge base."""
+        resp = self._http.post(
+            "/knowledge/create",
+            json={"name": name, "description": description},
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def list_directories(self, kb_id: str) -> list[dict[str, Any]]:
+        """GET /knowledge/{id}/dirs — list KB directories (flat)."""
+        resp = self._http.get(f"/knowledge/{kb_id}/dirs")
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("items", data) if isinstance(data, dict) else data

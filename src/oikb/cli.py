@@ -581,6 +581,74 @@ def sync(
         sys.exit(1)
 
 
+# ── add ─────────────────────────────────────────────────────────
+
+@cli.command()
+@click.argument("paths", nargs=-1, required=True, type=click.Path(exists=True))
+@common_options
+@click.option("--kb-name", default=None, help="Find-or-create the KB by name (alternative to --kb-id).")
+@click.option("--dir", "rel_dir", default=None, help="Destination directory inside the KB (created if missing).")
+@click.option("--no-index", is_flag=True, help="Register files without extracting/indexing them (browse-only).")
+@click.option("--reference", is_flag=True, help="Store a pointer to the file instead of its bytes (requires ENABLE_REFERENCE_FILES on the server).")
+@click.option("--dry-run", is_flag=True, help="List what would be added without uploading.")
+@click.option("-v", "--verbose", is_flag=True, help="Show per-file progress.")
+@click.pass_context
+def add(
+    ctx: click.Context,
+    paths: tuple[str, ...],
+    url: str | None,
+    token: str | None,
+    kb: str | None,
+    kb_name: str | None,
+    rel_dir: str | None,
+    no_index: bool,
+    reference: bool,
+    dry_run: bool,
+    verbose: bool,
+):
+    """Add FILES to a Knowledge Base (one-shot, no delete propagation).
+
+    FILES are local paths. Files already in the KB with the same name and
+    SHA-256 are skipped, so re-runs are idempotent. Unlike `sync`, nothing
+    is ever removed.
+    """
+    quiet = ctx.obj.get("quiet", False)
+    from oikb.add import add_files, resolve_kb
+
+    try:
+        client = _make_client(url, token)
+    except ValueError as e:
+        click.echo(click.style(f"Error: {e}", fg="red"), err=True)
+        sys.exit(1)
+
+    try:
+        try:
+            knowledge = resolve_kb(client, kb, kb_name)
+        except Exception as e:
+            raise click.ClickException(f"Could not resolve KB: {e}")
+
+        result = add_files(
+            client,
+            knowledge,
+            list(paths),
+            rel_dir=rel_dir,
+            index=not no_index,
+            reference=reference,
+            dry_run=dry_run,
+            verbose=verbose,
+        )
+
+        if not quiet:
+            prefix = "Dry run" if dry_run else "Add complete"
+            click.echo(f"{prefix}: {result.summary()}")
+        for err in result.errors:
+            click.echo(click.style(f"  ✗ {err}", fg="red"), err=True)
+        if result.errors:
+            sys.exit(1)
+    finally:
+        client.close()
+
+
 # ── diff ────────────────────────────────────────────────────────
 
 @cli.command()
